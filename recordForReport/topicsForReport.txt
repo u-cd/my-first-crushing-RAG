@@ -1,0 +1,46 @@
+fine tuning vs RAG
+    RAG may better
+
+process
+    1. Indexing
+        load documents
+        Document Loader or Text Chunker
+        Embedding Model
+        vector store
+    2. Retrieval (Search)
+        user submits a query
+        system serches the most relevant document from vectors
+    3. Generation
+        retrieved document are inserted into the original user query "augmented prompt"
+
+Key benefits
+    Ruduced hallucinations
+    Access to current data
+    Increased trust and transparency
+    Lower costs (compared to fine-tuning or retraining)
+    Enhanced customization
+
+Tools and frameworks
+    LangChain
+    LlamaIndex
+
+Real life exapmles
+    Chrome AI Mode
+    RAG for Academic Papers
+
+References
+    origin paper?
+        "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks"
+    Survey
+        「Retrieval-Augmented Generation for Large Language Models: A Survey」
+
+Agentic AI
+    Agentic AI can use RAG as one of its Tools
+    how copilot works
+
+MCP
+    MCP Orchestration
+    RAG Invocation
+
+RAG can use the results of Google Search
+    gemini already use RAG
