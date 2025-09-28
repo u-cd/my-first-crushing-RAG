@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  rag-system:
+    build: .
+    container_name: rag-system
+    stdin_open: true  # Enable interactive mode
+    tty: true        # Allocate pseudo-TTY
+    volumes:
+      - ./chroma_db:/app/chroma_db  # Persist vector database
+      - ./documents:/app/documents  # Documents to process automatically
+      - ./uploaded_documents:/app/uploaded_documents  # Document storage
+      - ./.env:/app/.env  # Environment variables
+    environment:
+      - CHROMA_PERSIST_DIRECTORY=/app/chroma_db
+    restart: unless-stopped
+
+  # Optional: ChromaDB standalone service (if you want separate DB container)
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: rag-chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./chroma_data:/chroma/chroma
+    environment:
+      - CHROMA_SERVER_AUTHN_CREDENTIALS_FILE=/chroma/chroma/auth.txt
+      - CHROMA_SERVER_AUTHN_PROVIDER=chromadb.auth.token.TokenAuthServerProvider
+    profiles:
+      - standalone-db  # Only start with --profile standalone-db

@@ -1,0 +1,26 @@
+text splitter
+    ragの世界には色々なテキストスプリッターがある
+    スプリッターによってチャンクとベクター埋め込みが変わるので超重要
+
+langchain.document
+    langchainではドキュメントをdocumentというオブジェクトとして扱う
+    関数間の受け渡しも基本的にこれをつかうっぽい
+
+sentence transformer
+    vector埋め込みにsentence transformerという別のトランスフォーマーを使うらしい
+
+    Text Chunk → SentenceTransformer → 384D Vector → ChromaDB
+        ↓              ↓                   ↓            ↓
+    "Machine learning  Neural Network    [0.12, -0.56,  Stored with
+     is a subset..."   Processing        0.90, ...]     similarity index
+
+how vector determine?
+    どうやってベクトルが決定されそれがどういう意味を持つのかはいまいち不明
+    しかしこのvectorがRAG全体の精度に大きく影響するはず
+
+search documents size
+    検索してとってくるドキュメントの数、3-10のことが多いらしい
+    多い方がいいきがする
+
+RetrievalQA
+    実際のQAフローの挙動を決定するっぽい

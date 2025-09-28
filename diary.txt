@@ -1,0 +1,16 @@
+claude write main file
+    key files
+        rag_system.py (main rag class)
+        simple_rag.py (for in terminal interface)
+        Dockerfile, docker-compose.yml
+
+i deleted some files
+    because claude create extra functionalities, like streamlit
+    also i deleted readme, because it's garbage
+
+read RAGSystem class in rag_system.py
+    this is main funciton of this rag system
+
+read simple_rag.py, want to change system little
+    add upload folder, want to add documents directly
+    want to check actual chunk and vector, and check what resource retrieved

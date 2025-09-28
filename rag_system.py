@@ -116,7 +116,7 @@ class VectorStore:
 class RAGSystem:
     """Main RAG system that orchestrates indexing, retrieval, and generation."""
     
-    def __init__(self, openai_api_key: str = None, temperature: float = 0.7, max_tokens: int = 500):
+    def __init__(self, openai_api_key: str = None, temperature: float = 0.7, max_tokens: int = 500, documents_folder: str = "./documents", auto_initialize: bool = True):
         # Set up OpenAI
         self.openai_api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
         if not self.openai_api_key:
@@ -150,6 +150,14 @@ Answer:""",
         )
         
         self.qa_chain = None
+        self.documents_folder = Path(documents_folder)
+        
+        # Create documents folder if it doesn't exist
+        self.documents_folder.mkdir(parents=True, exist_ok=True)
+        
+        # Auto-initialize if requested
+        if auto_initialize:
+            self.auto_initialize_from_documents()
     
     def index_documents(self, file_paths: List[str]) -> None:
         """Index documents into the vector store (Step 1: Indexing)."""
@@ -176,6 +184,51 @@ Answer:""",
         self.vector_store.load_vectorstore()
         self._initialize_qa_chain()
         logger.info("Index loaded successfully")
+    
+    def auto_initialize_from_documents(self) -> None:
+        """Automatically initialize RAG system by processing documents folder."""
+        logger.info(f"Checking documents folder: {self.documents_folder}")
+        
+        # Try to load existing index first
+        try:
+            self.load_existing_index()
+            logger.info("Loaded existing vector store")
+            return
+        except Exception:
+            logger.info("No existing index found, will process documents folder")
+        
+        # Get all supported document files from the folder
+        document_files = self.get_documents_from_folder()
+        
+        if document_files:
+            logger.info(f"Found {len(document_files)} documents to process")
+            self.index_documents(document_files)
+        else:
+            logger.info("No documents found in folder. Add documents to start using the system.")
+    
+    def get_documents_from_folder(self) -> List[str]:
+        """Get all supported document files from the documents folder."""
+        supported_extensions = ['.txt', '.pdf', '.md', '.doc', '.docx']
+        document_files = []
+        
+        for ext in supported_extensions:
+            pattern = f"*{ext}"
+            files = list(self.documents_folder.glob(pattern))
+            document_files.extend([str(f) for f in files])
+        
+        return sorted(document_files)
+    
+    def refresh_documents(self) -> bool:
+        """Refresh the system with any new documents in the folder."""
+        document_files = self.get_documents_from_folder()
+        
+        if document_files:
+            logger.info(f"Refreshing with {len(document_files)} documents")
+            self.index_documents(document_files)
+            return True
+        else:
+            logger.info("No documents found to refresh")
+            return False
     
     def _initialize_qa_chain(self) -> None:
         """Initialize the QA chain with retriever."""
