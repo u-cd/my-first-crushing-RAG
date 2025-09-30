@@ -1,5 +1,4 @@
 import os
-import logging
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
@@ -16,10 +15,6 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 class DocumentProcessor:
@@ -47,17 +42,15 @@ class DocumentProcessor:
                 
                 docs = loader.load()
                 documents.extend(docs)
-                logger.info(f"Loaded {len(docs)} documents from {file_path}")
                 
             except Exception as e:
-                logger.error(f"Error loading {file_path}: {str(e)}")
+                pass
         
         return documents
     
     def chunk_documents(self, documents: List[Document]) -> List[Document]:
         """Split documents into smaller chunks."""
         chunks = self.text_splitter.split_documents(documents)
-        logger.info(f"Created {len(chunks)} chunks from {len(documents)} documents")
         return chunks
 
 
@@ -86,9 +79,7 @@ class VectorStore:
                 collection_name=collection_name
             )
             self.vectorstore.persist()
-            logger.info(f"Created fresh vector store '{collection_name}' with {len(documents)} documents")
         except Exception as e:
-            logger.error(f"Error creating vector store: {str(e)}")
             raise
     
     def load_vectorstore(self) -> None:
@@ -98,25 +89,9 @@ class VectorStore:
                 persist_directory=self.persist_directory,
                 embedding_function=self.embeddings
             )
-            logger.info("Loaded existing vector store")
         except Exception as e:
-            logger.error(f"Error loading vector store: {str(e)}")
             raise
-    
-    def similarity_search(self, query: str, k: int = 4) -> List[Document]:
-        """Perform similarity search on the vector store."""
-        if not self.vectorstore:
-            raise ValueError("Vector store not initialized")
         
-        return self.vectorstore.similarity_search(query, k=k)
-    
-    def as_retriever(self, k: int = 4):
-        """Return the vector store as a retriever."""
-        if not self.vectorstore:
-            raise ValueError("Vector store not initialized")
-        
-        return self.vectorstore.as_retriever(search_kwargs={"k": k})
-    
     def clear_vectorstore(self) -> None:
         """Clear the existing vector store by removing persist directory."""
         import shutil
@@ -132,20 +107,16 @@ class VectorStore:
                 for attempt in range(3):
                     try:
                         shutil.rmtree(self.persist_directory)
-                        logger.info(f"Cleared existing vector store at {self.persist_directory}")
                         break
                     except (OSError, PermissionError) as e:
                         if attempt == 2:  # Last attempt
-                            logger.warning(f"Could not clear vector store directory (attempt {attempt+1}): {str(e)}")
-                            logger.info("Will create new collection instead of clearing directory")
                             return
                         time.sleep(1)  # Wait before retry
             
             # Recreate the directory
             Path(self.persist_directory).mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            logger.warning(f"Could not clear vector store directory: {str(e)}")
-            logger.info("Will proceed with existing directory - creating fresh collection")
+            pass
 
 
 class RAGSystem:
@@ -196,10 +167,7 @@ Answer:""",
     
     def index_documents(self, file_paths: List[str]) -> None:
         """Index documents into the vector store (Step 1: Indexing)."""
-        logger.info("Starting fresh document indexing...")
-        
         # Clear existing vector store to start fresh
-        logger.info("Clearing existing vector store...")
         self.vector_store.clear_vectorstore()
         
         # Load and chunk documents
@@ -208,35 +176,20 @@ Answer:""",
             raise ValueError("No documents were loaded")
         
         chunks = self.document_processor.chunk_documents(documents)
-        logger.info(f"Created {len(chunks)} chunks from {len(documents)} documents")
         
         # Create fresh vector store
         self.vector_store.create_vectorstore(chunks)
         
         # Initialize QA chain
         self._initialize_qa_chain()
-        
-        logger.info("Document indexing completed successfully")
-    
-    def load_existing_index(self) -> None:
-        """Load an existing vector store index."""
-        logger.info("Loading existing index...")
-        self.vector_store.load_vectorstore()
-        self._initialize_qa_chain()
-        logger.info("Index loaded successfully")
     
     def auto_initialize_from_documents(self) -> None:
         """Automatically initialize RAG system by processing documents folder."""
-        logger.info(f"Checking documents folder: {self.documents_folder}")
-        
         # Always process documents folder to create fresh chunks and vectors
         document_files = self.get_documents_from_folder()
         
         if document_files:
-            logger.info(f"Found {len(document_files)} documents - creating fresh chunks and vectors")
             self.index_documents(document_files)
-        else:
-            logger.info("No documents found in folder. Add documents to start using the system.")
     
     def get_documents_from_folder(self) -> List[str]:
         """Get all supported document files from the documents folder."""
@@ -249,22 +202,10 @@ Answer:""",
             document_files.extend([str(f) for f in files])
         
         return sorted(document_files)
-    
-    def refresh_documents(self) -> bool:
-        """Refresh the system with any new documents in the folder."""
-        document_files = self.get_documents_from_folder()
         
-        if document_files:
-            logger.info(f"Refreshing with {len(document_files)} documents")
-            self.index_documents(document_files)
-            return True
-        else:
-            logger.info("No documents found to refresh")
-            return False
-    
-    def _initialize_qa_chain(self) -> None:
+    def _initialize_qa_chain(self, k: int = 4) -> None:
         """Initialize the QA chain with retriever."""
-        retriever = self.vector_store.as_retriever()
+        retriever = self.vector_store.vectorstore.as_retriever(search_kwargs={"k": k})
         self.qa_chain = RetrievalQA.from_chain_type(
             llm=self.llm,
             chain_type="stuff",
@@ -273,19 +214,10 @@ Answer:""",
             return_source_documents=True
         )
     
-    def retrieve_documents(self, query: str, k: int = 4) -> List[Document]:
-        """Retrieve relevant documents (Step 2: Retrieval)."""
-        if not self.vector_store.vectorstore:
-            raise ValueError("Vector store not initialized. Please index documents first.")
-        
-        return self.vector_store.similarity_search(query, k=k)
-    
     def generate_answer(self, query: str, include_sources: bool = True) -> Dict[str, Any]:
         """Generate answer using retrieved context (Step 3: Generation)."""
         if not self.qa_chain:
             raise ValueError("QA chain not initialized. Please index documents first.")
-        
-        logger.info(f"Processing query: {query}")
         
         # Get answer with source documents - this uses the same retriever as the QA chain
         result = self.qa_chain({"query": query})
@@ -298,57 +230,61 @@ Answer:""",
             actual_prompt = f"No context retrieved for query: {query}"
         
         response = {
-            "query": query,
             "answer": result["result"],
             "actual_prompt": actual_prompt,
-            "source_documents": []
         }
         
-        if include_sources and "source_documents" in result:
-            for i, doc in enumerate(result["source_documents"]):
-                source_info = {
-                    "content": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content,
-                    "metadata": doc.metadata,
-                    "index": i + 1
-                }
-                response["source_documents"].append(source_info)
-        
-        logger.info("Answer generated successfully")
         return response
     
-    def ask(self, question: str) -> str:
-        """Simple interface to ask a question and get an answer."""
-        result = self.generate_answer(question, include_sources=False)
-        return result["answer"]
-
 
 def main():
     """Example usage of the RAG system."""
     try:
         # Initialize RAG system
+        print("🚀 Initializing RAG System...")
         rag = RAGSystem()
         
-        # Example: Index some documents
-        # documents = ["path/to/document1.txt", "path/to/document2.pdf"]
-        # rag.index_documents(documents)
+        if not rag.qa_chain:
+            print("❌ No documents found. Please add documents to the documents/ folder first.")
+            return
+            
+        print("✅ RAG system initialized successfully!")
+        print("💬 You can now ask questions about your documents.")
+        print("=" * 50)
         
-        # Or load existing index
-        # rag.load_existing_index()
-        
-        # Ask questions
-        # question = "What is retrieval-augmented generation?"
-        # answer = rag.ask(question)
-        # print(f"Q: {question}")
-        # print(f"A: {answer}")
-        
-        print("RAG system initialized successfully!")
-        print("To use:")
-        print("1. Add your documents and call rag.index_documents([file_paths])")
-        print("2. Ask questions using rag.ask('your question')")
+        # Interactive query loop
+        while True:
+            try:
+                # Get query from user
+                query = input("\n❓ Your question (or 'quit' to exit): ").strip()
+                
+                if not query:
+                    print("Please enter a question.")
+                    continue
+                    
+                if query.lower() in ['quit', 'exit', 'q']:
+                    print("👋 Goodbye!")
+                    break
+                
+                # Generate answer
+                print("\n🔍 Processing your question...")
+                result = rag.generate_answer(query)
+                
+                # Display results
+                print(f"\n🤖 Answer: {result['answer']}")
+                print(f"\n📝 Actual Prompt Used:")
+                print("=" * 50)
+                print(result['actual_prompt'])
+                print("=" * 50)
+                
+            except KeyboardInterrupt:
+                print("\n👋 Goodbye!")
+                break
+            except Exception as e:
+                print(f"❌ Error processing question: {str(e)}")
         
     except Exception as e:
-        logger.error(f"Error in main: {str(e)}")
-
+        print(f"❌ Failed to initialize RAG system: {str(e)}")
 
 if __name__ == "__main__":
     main()

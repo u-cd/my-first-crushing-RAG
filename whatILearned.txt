@@ -25,3 +25,6 @@ search documents size
 RetrievalQA
     実際のQAフローの挙動を決定するっぽい
     this class is past thing, official document say
+
+いらないコードを消す
+    どういう状態をいいコードの状態とするかの問題がある

@@ -22,3 +22,7 @@ docker problem
 
 retrieve problem
     system retrieve completely same context, not reflect query meaning
+
+    possible reason (chunking is not the issue)
+        vector embedding issue
+        retrive issue
