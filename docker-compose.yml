@@ -11,6 +11,11 @@ services:
       - ./documents:/app/documents  # Documents to process automatically
       - ./uploaded_documents:/app/uploaded_documents  # Document storage
       - ./.env:/app/.env  # Environment variables
+      # Bind mount source code for real-time development
+      - ./rag_system.py:/app/rag_system.py  # Main RAG system
+      - ./simple_rag.py:/app/simple_rag.py  # Interface code
+      - ./database_explorer.py:/app/database_explorer.py  # Database explorer
+      - ./requirements.txt:/app/requirements.txt  # Dependencies
     environment:
       - CHROMA_PERSIST_DIRECTORY=/app/chroma_db
     restart: unless-stopped

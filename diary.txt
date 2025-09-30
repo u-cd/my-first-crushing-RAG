@@ -14,3 +14,11 @@ read RAGSystem class in rag_system.py
 read simple_rag.py, want to change system little
     add upload folder, want to add documents directly
     want to check actual chunk and vector, and check what resource retrieved
+
+docker problem
+    I need to do "bind mout" to reflect file edit
+
+    not relate, i want to main class and interface code more minimal
+
+retrieve problem
+    system retrieve completely same context, not reflect query meaning

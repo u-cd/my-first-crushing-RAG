@@ -2,6 +2,7 @@
 """
 Simple command-line interface for the RAG system
 No Streamlit required - pure Python interaction
+Version: Docker Development Mode
 """
 
 import os
@@ -25,6 +26,7 @@ class SimpleRAGInterface:
     def setup_rag_system(self):
         """Initialize the RAG system."""
         print("🚀 Initializing RAG System...")
+        print("📄 Processing documents folder - creating fresh chunks and vectors...")
         
         # Check for API key
         api_key = os.getenv("OPENAI_API_KEY")
@@ -37,7 +39,7 @@ class SimpleRAGInterface:
         
         try:
             self.rag = RAGSystem(openai_api_key=api_key)
-            print("✅ RAG system initialized successfully!")
+            print("✅ RAG system initialized with fresh document processing!")
         except Exception as e:
             print(f"❌ Error initializing RAG system: {str(e)}")
             sys.exit(1)
@@ -54,17 +56,16 @@ class SimpleRAGInterface:
         try:
             if show_sources:
                 result = self.rag.generate_answer(question)
+                
+                # Show the actual prompt sent to LLM
+                if 'actual_prompt' in result:
+                    print(f"\n📝 Actual Prompt Sent to LLM:")
+                    print("=" * 50)
+                    print(result['actual_prompt'])
+                    print("=" * 50)
+                
                 print(f"\n🤖 Answer: {result['answer']}")
                 
-                if result['source_documents']:
-                    print(f"\n📚 Sources ({len(result['source_documents'])}):")
-                    for i, source in enumerate(result['source_documents'], 1):
-                        print(f"  {i}. {source['content'][:100]}...")
-                        if source.get('metadata', {}).get('source'):
-                            source_file = Path(source['metadata']['source']).name
-                            print(f"     From: {source_file}")
-                else:
-                    print("📚 No sources found.")
             else:
                 answer = self.rag.ask(question)
                 print(f"\n🤖 Answer: {answer}")

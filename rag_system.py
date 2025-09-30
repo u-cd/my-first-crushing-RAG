@@ -74,14 +74,19 @@ class VectorStore:
     
     def create_vectorstore(self, documents: List[Document]) -> None:
         """Create a vector store from documents."""
+        import uuid
         try:
+            # Use a unique collection name to avoid conflicts
+            collection_name = f"rag_collection_{uuid.uuid4().hex[:8]}"
+            
             self.vectorstore = Chroma.from_documents(
                 documents=documents,
                 embedding=self.embeddings,
-                persist_directory=self.persist_directory
+                persist_directory=self.persist_directory,
+                collection_name=collection_name
             )
             self.vectorstore.persist()
-            logger.info(f"Created vector store with {len(documents)} documents")
+            logger.info(f"Created fresh vector store '{collection_name}' with {len(documents)} documents")
         except Exception as e:
             logger.error(f"Error creating vector store: {str(e)}")
             raise
@@ -111,6 +116,36 @@ class VectorStore:
             raise ValueError("Vector store not initialized")
         
         return self.vectorstore.as_retriever(search_kwargs={"k": k})
+    
+    def clear_vectorstore(self) -> None:
+        """Clear the existing vector store by removing persist directory."""
+        import shutil
+        import time
+        try:
+            # First, try to close any existing vectorstore connection
+            if self.vectorstore is not None:
+                self.vectorstore = None
+                time.sleep(0.5)  # Give it a moment to release resources
+            
+            if Path(self.persist_directory).exists():
+                # Try multiple times to handle resource busy errors
+                for attempt in range(3):
+                    try:
+                        shutil.rmtree(self.persist_directory)
+                        logger.info(f"Cleared existing vector store at {self.persist_directory}")
+                        break
+                    except (OSError, PermissionError) as e:
+                        if attempt == 2:  # Last attempt
+                            logger.warning(f"Could not clear vector store directory (attempt {attempt+1}): {str(e)}")
+                            logger.info("Will create new collection instead of clearing directory")
+                            return
+                        time.sleep(1)  # Wait before retry
+            
+            # Recreate the directory
+            Path(self.persist_directory).mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logger.warning(f"Could not clear vector store directory: {str(e)}")
+            logger.info("Will proceed with existing directory - creating fresh collection")
 
 
 class RAGSystem:
@@ -161,7 +196,11 @@ Answer:""",
     
     def index_documents(self, file_paths: List[str]) -> None:
         """Index documents into the vector store (Step 1: Indexing)."""
-        logger.info("Starting document indexing...")
+        logger.info("Starting fresh document indexing...")
+        
+        # Clear existing vector store to start fresh
+        logger.info("Clearing existing vector store...")
+        self.vector_store.clear_vectorstore()
         
         # Load and chunk documents
         documents = self.document_processor.load_documents(file_paths)
@@ -169,8 +208,9 @@ Answer:""",
             raise ValueError("No documents were loaded")
         
         chunks = self.document_processor.chunk_documents(documents)
+        logger.info(f"Created {len(chunks)} chunks from {len(documents)} documents")
         
-        # Create vector store
+        # Create fresh vector store
         self.vector_store.create_vectorstore(chunks)
         
         # Initialize QA chain
@@ -189,19 +229,11 @@ Answer:""",
         """Automatically initialize RAG system by processing documents folder."""
         logger.info(f"Checking documents folder: {self.documents_folder}")
         
-        # Try to load existing index first
-        try:
-            self.load_existing_index()
-            logger.info("Loaded existing vector store")
-            return
-        except Exception:
-            logger.info("No existing index found, will process documents folder")
-        
-        # Get all supported document files from the folder
+        # Always process documents folder to create fresh chunks and vectors
         document_files = self.get_documents_from_folder()
         
         if document_files:
-            logger.info(f"Found {len(document_files)} documents to process")
+            logger.info(f"Found {len(document_files)} documents - creating fresh chunks and vectors")
             self.index_documents(document_files)
         else:
             logger.info("No documents found in folder. Add documents to start using the system.")
@@ -255,12 +287,20 @@ Answer:""",
         
         logger.info(f"Processing query: {query}")
         
-        # Get answer with source documents
+        # Get answer with source documents - this uses the same retriever as the QA chain
         result = self.qa_chain({"query": query})
+        
+        # Get the same documents that were actually used by the QA chain
+        if "source_documents" in result:
+            actual_context = "\n\n".join([doc.page_content for doc in result["source_documents"]])
+            actual_prompt = self.prompt_template.format(context=actual_context, question=query)
+        else:
+            actual_prompt = f"No context retrieved for query: {query}"
         
         response = {
             "query": query,
             "answer": result["result"],
+            "actual_prompt": actual_prompt,
             "source_documents": []
         }
         

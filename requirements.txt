@@ -12,6 +12,7 @@ sentence-transformers>=2.2.0
 
 # Document processing
 pypdf2>=3.0.0
+pypdf>=4.0.0
 
 # Data processing
 numpy>=1.21.0
